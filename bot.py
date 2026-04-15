@@ -5,6 +5,10 @@ from config import TELEGRAM_TOKEN, OLLAMA_URL, MODEL
 from pypdf import PdfReader
 from collections import defaultdict
 import json
+
+from sentence_transformers import SentenceTransformer
+from qdrant_client import QdrantClient
+
 memory = defaultdict(list)
 MAX_HISTORY = 5  # keep it small, you're not writing a novel
 def load_resume():
@@ -15,6 +19,23 @@ def load_resume():
         text += page.extract_text() + "\n"
 
     return text
+
+# load once (important)
+model = SentenceTransformer("all-MiniLM-L6-v2")
+client = QdrantClient("localhost", port=6333)
+
+COLLECTION_NAME = "obsidian_notes"
+
+def retrieve(query, top_k=5):
+    query_vector = model.encode(query)
+
+    results = client.query_points(
+        collection_name=COLLECTION_NAME,
+        query=query_vector,
+        limit=top_k
+    )
+
+    return [r.payload["text"] for r in results.points]
 
 RESUME_TEXT = load_resume()
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -32,16 +53,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 3. build history string (no json nonsense)
     history = "\n".join(memory[user_id])
 
+    # 4. retrieve relevant info from Qdrant
+    context = retrieve(user_text)
+
     # 4. build prompt
     prompt = f"""
 You are a helpful assistant.
-Refer to this resume for context:
-{RESUME_TEXT}
-Conversation so far:
-{history}
+Here is some context:
+{context}
 
+user: {user_text}
 Assistant:
     """
+
+    print(context)
     # print(f'Prompt: {prompt}\n')
     if not user_text:
         return
