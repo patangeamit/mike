@@ -35,7 +35,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 4. build prompt
     prompt = f"""
 You are a helpful assistant.
-
+Refer to this resume for context:
+{RESUME_TEXT}
 Conversation so far:
 {history}
 
