@@ -34,8 +34,13 @@ def retrieve(query, top_k=5):
         query=query_vector,
         limit=top_k
     )
+    context = []
+    for r in results.points:
+        text = r.payload["text"]
+        file = r.payload["file"]
+        context.append({"text": text, "file": file})
 
-    return [r.payload["text"] for r in results.points]
+    return context
 
 RESUME_TEXT = load_resume()
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -82,9 +87,9 @@ Assistant:
             timeout=60,
         )
 
-        reply = response.json()["response"]
-
-        reply = reply[:4000]
+        llm_reply = response.json()["response"]
+        reply = "Note used: " + context[0]["file"] + "\n" + "\n" + llm_reply[:4000]
+        
         print(f"@{username}")
         print(f"Bot: {reply}\n---")
         await update.message.reply_text(reply)
